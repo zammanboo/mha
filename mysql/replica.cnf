@@ -31,5 +31,15 @@ super_read_only = ON
 # Keep binary logs long enough for delayed recovery and failback.
 binlog_expire_logs_seconds = 604800
 
+# Semi-sync replication reduces acknowledged transaction loss on unplanned failover.
+# It does not replace fencing/quorum and does not by itself prevent split-brain.
+# Both plugins are loaded on every node so roles can switch without restart.
+plugin-load-add = rpl_semi_sync_source=semisync_source.so
+plugin-load-add = rpl_semi_sync_replica=semisync_replica.so
+rpl_semi_sync_source_enabled = ON
+rpl_semi_sync_replica_enabled = ON
+rpl_semi_sync_source_timeout = 1000
+rpl_semi_sync_source_wait_for_replica_count = 1
+
 # Recommended for Orchestrator visibility.
 performance_schema = ON

@@ -65,6 +65,7 @@ detect_mysql_conf_dir() {
   elif [ -d /etc/my.cnf.d ]; then
     echo /etc/my.cnf.d
   else
+    echo "warning: neither /etc/mysql/conf.d nor /etc/my.cnf.d found; defaulting to /etc/mysql/conf.d — verify MySQL includes this path via !includedir" >&2
     echo /etc/mysql/conf.d
   fi
 }
@@ -79,10 +80,10 @@ render_file "${REPO_ROOT}/orchestrator/orchestrator.conf.json" /etc/orchestrator
 mysql_conf_dir="$(detect_mysql_conf_dir)"
 if [ "${ROLE}" = "primary" ]; then
   copy_file "${REPO_ROOT}/mysql/primary.cnf" "${mysql_conf_dir}/mysql-ha.cnf" 0644
-  render_file "${REPO_ROOT}/keepalived/keepalived-primary.conf" /etc/keepalived/keepalived.conf 0644
+  render_file "${REPO_ROOT}/keepalived/keepalived-primary.conf" /etc/keepalived/keepalived.conf 0640
 else
   copy_file "${REPO_ROOT}/mysql/replica.cnf" "${mysql_conf_dir}/mysql-ha.cnf" 0644
-  render_file "${REPO_ROOT}/keepalived/keepalived-replica.conf" /etc/keepalived/keepalived.conf 0644
+  render_file "${REPO_ROOT}/keepalived/keepalived-replica.conf" /etc/keepalived/keepalived.conf 0640
 fi
 
 echo "deployed runtime files for ${ROLE}"

@@ -30,14 +30,14 @@
   "DetachLostSlavesAfterMasterFailover": true,
 
   "PreFailoverProcesses": [
-    "__BASE_DIR__/scripts/proxysql_failover.py pre --failed-host '{failedHost}' --failed-port '{failedPort}' --successor-host '{successorHost}' --successor-port '{successorPort}'"
+    "FAILED_HOST='{failedHost}' FAILED_PORT='{failedPort}' SUCCESSOR_HOST='{successorHost}' SUCCESSOR_PORT='{successorPort}' __BASE_DIR__/scripts/proxysql_failover.py pre"
   ],
   "PostFailoverProcesses": [
-    "__BASE_DIR__/scripts/proxysql_failover.py post --failed-host '{failedHost}' --failed-port '{failedPort}' --successor-host '{successorHost}' --successor-port '{successorPort}'"
+    "FAILED_HOST='{failedHost}' FAILED_PORT='{failedPort}' SUCCESSOR_HOST='{successorHost}' SUCCESSOR_PORT='{successorPort}' __BASE_DIR__/scripts/proxysql_failover.py post"
   ],
 
   "PostGracefulTakeoverProcesses": [
-    "__BASE_DIR__/scripts/proxysql_failover.py post --failed-host '{failedHost}' --failed-port '{failedPort}' --successor-host '{successorHost}' --successor-port '{successorPort}'"
+    "FAILED_HOST='{failedHost}' FAILED_PORT='{failedPort}' SUCCESSOR_HOST='{successorHost}' SUCCESSOR_PORT='{successorPort}' __BASE_DIR__/scripts/proxysql_failover.py graceful"
   ],
 
   "URLPrefix": "",

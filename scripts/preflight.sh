@@ -58,4 +58,14 @@ if [ -f /etc/keepalived/keepalived.conf ] && grep -q "__BASE_DIR__" /etc/keepali
   exit 1
 fi
 
+for config_file in \
+    /etc/orchestrator.conf.json \
+    /etc/keepalived/keepalived.conf \
+    /etc/mysql-ha.env; do
+  if [ -f "${config_file}" ] && grep -qE "CHANGE_ME" "${config_file}"; then
+    echo "unset CHANGE_ME placeholder found in ${config_file}" >&2
+    exit 1
+  fi
+done
+
 echo "preflight ok"

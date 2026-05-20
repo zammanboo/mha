@@ -61,9 +61,15 @@ pkg_install_best_effort() {
 install_percona_release_deb() {
   apt-get update
   apt-get install -y ca-certificates curl gnupg
-  curl -fsSL -o /tmp/percona-release_latest.generic_all.deb \
+  curl -fsSL --retry 3 -o /tmp/percona-release_latest.generic_all.deb \
     https://repo.percona.com/apt/percona-release_latest.generic_all.deb
+  dpkg-deb --info /tmp/percona-release_latest.generic_all.deb >/dev/null 2>&1 || {
+    echo "downloaded Percona release package is not a valid .deb; aborting" >&2
+    rm -f /tmp/percona-release_latest.generic_all.deb
+    exit 1
+  }
   apt-get install -y /tmp/percona-release_latest.generic_all.deb
+  rm -f /tmp/percona-release_latest.generic_all.deb
 }
 
 install_percona_release_rpm() {

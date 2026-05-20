@@ -179,6 +179,8 @@ sudo FORCE=1 ./scripts/deploy_configs.sh primary
 
 설정 파일의 `CHANGE_ME_*`, hostname, VIP, interface 값을 수정한 뒤 필요한 서비스만 재시작합니다.
 
+주의: `proxysql/bootstrap.sql`의 `CHANGE_ME_PROXYSQL_ADMIN` 값과 `/etc/mysql-ha.env`의 `PROXYSQL_ADMIN_PASSWORD` 값은 반드시 동일해야 합니다. ProxySQL admin 비밀번호가 서로 다르면 Orchestrator hook이 장애조치 후 ProxySQL hostgroup을 갱신하지 못합니다.
+
 ```bash
 sudo ./scripts/restart_services.sh mysql
 sudo ./scripts/restart_services.sh proxy

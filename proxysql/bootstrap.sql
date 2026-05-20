@@ -40,3 +40,12 @@ LOAD MYSQL USERS TO RUNTIME;
 SAVE MYSQL USERS TO DISK;
 LOAD MYSQL QUERY RULES TO RUNTIME;
 SAVE MYSQL QUERY RULES TO DISK;
+
+-- Change default admin credentials last so this script can run with the
+-- default password. After this runs, reconnect with the new credentials.
+-- Keep this value in sync with PROXYSQL_ADMIN_PASSWORD in /etc/mysql-ha.env.
+UPDATE global_variables
+  SET variable_value = 'admin:CHANGE_ME_PROXYSQL_ADMIN'
+  WHERE variable_name = 'admin-admin_credentials';
+LOAD ADMIN VARIABLES TO RUNTIME;
+SAVE ADMIN VARIABLES TO DISK;

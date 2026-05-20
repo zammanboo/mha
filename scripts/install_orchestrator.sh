@@ -29,6 +29,10 @@ ensure_runtime_user() {
   fi
   mkdir -p /var/lib/orchestrator
   chown orchestrator:orchestrator /var/lib/orchestrator
+  if [ -f "${ENV_FILE}" ]; then
+    chown root:orchestrator "${ENV_FILE}"
+    chmod 0640 "${ENV_FILE}"
+  fi
 }
 
 install_service_if_missing() {

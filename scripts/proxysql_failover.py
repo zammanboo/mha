@@ -3,12 +3,23 @@
 
 Requires PyMySQL:
   python3 -m pip install -r requirements.txt
+
+Phases:
+  pre      — mark failed host OFFLINE_SOFT before promotion (unplanned failover)
+  post     — promote successor as writer, keep old writer OFFLINE_SOFT in reader
+             group (unplanned failover; old master may be dead)
+  graceful — same routing change but old writer is set ONLINE in reader group
+             (graceful switchover; old master is healthy and will rejoin as replica)
+
+Arguments are read from environment variables set by Orchestrator:
+  FAILED_HOST, FAILED_PORT, SUCCESSOR_HOST, SUCCESSOR_PORT
 """
 
 from __future__ import annotations
 
-import argparse
+import logging
 import os
+import re
 import sys
 
 try:
@@ -16,10 +27,36 @@ try:
 except ImportError as exc:
     raise SystemExit("PyMySQL is required. Install with: python3 -m pip install pymysql") from exc
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    stream=sys.stderr,
+)
+logger = logging.getLogger(__name__)
+
+_HOSTNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,253}$")
+
+
+def require_host(value: str, name: str) -> str:
+    if not value:
+        raise SystemExit(f"{name} env var is required")
+    return validate_host(value, name)
+
+
+def validate_host(value: str, name: str) -> str:
+    if not _HOSTNAME_RE.match(value):
+        raise SystemExit(f"invalid {name}: {value!r}")
+    return value
+
 
 def env_int(name: str, default: int) -> int:
     value = os.getenv(name)
-    return default if value is None or value == "" else int(value)
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        raise SystemExit(f"env var {name}={value!r} is not a valid integer")
 
 
 def connect():
@@ -47,15 +84,19 @@ def load_and_save(cur):
 
 
 def pre_failover(cur, failed_host: str, failed_port: int):
+    logger.info("pre_failover: marking %s:%d OFFLINE_SOFT", failed_host, failed_port)
     execute(
         cur,
         "UPDATE mysql_servers SET status = 'OFFLINE_SOFT' WHERE hostname = %s AND port = %s",
         (failed_host, failed_port),
     )
     load_and_save(cur)
+    logger.info("pre_failover: done")
 
 
-def post_failover(cur, failed_host: str, failed_port: int, successor_host: str, successor_port: int):
+def _promote_successor(cur, failed_host: str, failed_port: int,
+                       successor_host: str, successor_port: int,
+                       old_writer_status: str):
     writer_hg = env_int("PROXYSQL_WRITER_HOSTGROUP", 10)
     reader_hg = env_int("PROXYSQL_READER_HOSTGROUP", 20)
     max_lag = env_int("PROXYSQL_MAX_REPLICATION_LAG", 5)
@@ -77,39 +118,67 @@ def post_failover(cur, failed_host: str, failed_port: int, successor_host: str, 
         cur,
         """
         REPLACE INTO mysql_servers(hostgroup_id, hostname, port, status, max_replication_lag, comment)
-        VALUES(%s, %s, %s, 'OFFLINE_SOFT', %s, 'old writer after failover')
+        VALUES(%s, %s, %s, %s, %s, 'old writer after failover')
         """,
-        (reader_hg, failed_host, failed_port, max_lag),
+        (reader_hg, failed_host, failed_port, old_writer_status, max_lag),
     )
     load_and_save(cur)
 
 
-def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("pre", "post"))
-    parser.add_argument("--failed-host", required=True)
-    parser.add_argument("--failed-port", type=int, default=3306)
-    parser.add_argument("--successor-host", default="")
-    parser.add_argument("--successor-port", type=int, default=3306)
-    return parser.parse_args(argv)
+def post_failover(cur, failed_host: str, failed_port: int,
+                  successor_host: str, successor_port: int):
+    logger.info(
+        "post_failover: promoting %s:%d as writer; old writer %s:%d -> OFFLINE_SOFT in reader group",
+        successor_host, successor_port, failed_host, failed_port,
+    )
+    _promote_successor(cur, failed_host, failed_port,
+                       successor_host, successor_port,
+                       old_writer_status="OFFLINE_SOFT")
+    logger.info("post_failover: done")
+
+
+def post_graceful_takeover(cur, failed_host: str, failed_port: int,
+                           successor_host: str, successor_port: int):
+    logger.info(
+        "post_graceful: promoting %s:%d as writer; old writer %s:%d -> ONLINE in reader group",
+        successor_host, successor_port, failed_host, failed_port,
+    )
+    _promote_successor(cur, failed_host, failed_port,
+                       successor_host, successor_port,
+                       old_writer_status="ONLINE")
+    logger.info("post_graceful: done")
+
+
+def parse_args(argv: list[str]) -> str:
+    """Return the phase name from argv; remaining args come from env vars."""
+    if len(argv) != 1 or argv[0] not in ("pre", "post", "graceful"):
+        raise SystemExit("usage: proxysql_failover.py {pre|post|graceful}")
+    return argv[0]
 
 
 def main(argv: list[str]) -> int:
-    args = parse_args(argv)
+    phase = parse_args(argv)
+
+    failed_host = require_host(os.environ.get("FAILED_HOST", ""), "FAILED_HOST")
+    failed_port = env_int("FAILED_PORT", 3306)
+
+    if phase in ("post", "graceful"):
+        successor_host = require_host(
+            os.environ.get("SUCCESSOR_HOST", ""), "SUCCESSOR_HOST"
+        )
+        successor_port = env_int("SUCCESSOR_PORT", 3306)
+    else:
+        successor_host = ""
+        successor_port = 3306
+
     with connect() as conn:
         with conn.cursor() as cur:
-            if args.phase == "pre":
-                pre_failover(cur, args.failed_host, args.failed_port)
+            if phase == "pre":
+                pre_failover(cur, failed_host, failed_port)
+            elif phase == "post":
+                post_failover(cur, failed_host, failed_port, successor_host, successor_port)
             else:
-                if not args.successor_host:
-                    raise SystemExit("--successor-host is required for post phase")
-                post_failover(
-                    cur,
-                    args.failed_host,
-                    args.failed_port,
-                    args.successor_host,
-                    args.successor_port,
-                )
+                post_graceful_takeover(cur, failed_host, failed_port, successor_host, successor_port)
     return 0
 
 
