@@ -1,0 +1,17 @@
+[Unit]
+Description=MySQL Orchestrator
+Documentation=https://github.com/percona/orchestrator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=orchestrator
+Group=orchestrator
+ExecStart=/usr/local/bin/orchestrator http
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

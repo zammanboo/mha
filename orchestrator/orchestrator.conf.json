@@ -1,0 +1,46 @@
+{
+  "Debug": false,
+  "ListenAddress": ":3000",
+  "BackendDB": "sqlite",
+  "SQLite3DataFile": "/var/lib/orchestrator/orchestrator.sqlite3",
+
+  "MySQLTopologyUser": "orchestrator",
+  "MySQLTopologyPassword": "CHANGE_ME_ORCH_PASSWORD",
+  "MySQLTopologyCredentialsConfigFile": "",
+  "MySQLTopologySSLPrivateKeyFile": "",
+  "MySQLTopologySSLCertFile": "",
+  "MySQLTopologySSLCAFile": "",
+  "MySQLTopologySSLSkipVerify": false,
+
+  "DiscoverByShowSlaveHosts": true,
+  "InstancePollSeconds": 5,
+  "UnseenInstanceForgetHours": 240,
+  "SnapshotTopologiesIntervalHours": 0,
+
+  "RecoverMasterClusterFilters": [
+    "*"
+  ],
+  "RecoverIntermediateMasterClusterFilters": [
+    "*"
+  ],
+  "RecoveryPeriodBlockSeconds": 300,
+  "FailureDetectionPeriodBlockMinutes": 5,
+  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "FailMasterPromotionIfSQLThreadNotUpToDate": true,
+  "DetachLostSlavesAfterMasterFailover": true,
+
+  "PreFailoverProcesses": [
+    "__BASE_DIR__/scripts/proxysql_failover.py pre --failed-host '{failedHost}' --failed-port '{failedPort}' --successor-host '{successorHost}' --successor-port '{successorPort}'"
+  ],
+  "PostFailoverProcesses": [
+    "__BASE_DIR__/scripts/proxysql_failover.py post --failed-host '{failedHost}' --failed-port '{failedPort}' --successor-host '{successorHost}' --successor-port '{successorPort}'"
+  ],
+
+  "PostGracefulTakeoverProcesses": [
+    "__BASE_DIR__/scripts/proxysql_failover.py post --failed-host '{failedHost}' --failed-port '{failedPort}' --successor-host '{successorHost}' --successor-port '{successorPort}'"
+  ],
+
+  "URLPrefix": "",
+  "StatusEndpoint": "/api/status",
+  "StatusSimpleHealth": true
+}
